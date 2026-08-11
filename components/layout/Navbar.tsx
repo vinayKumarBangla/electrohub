@@ -51,16 +51,19 @@ export default function Navbar() {
       setLoading(false);
     });
 
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setDropdownOpen(false);
       }
     };
+    
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
 
     return () => {
       subscription.unsubscribe();
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
   }, []);
 
@@ -77,7 +80,7 @@ export default function Navbar() {
   };
 
   return (
-    <header className="bg-[#131822] border-b border-slate-800 sticky top-0 z-50 px-4 sm:px-6 py-3.5 flex items-center justify-between shadow-md">
+    <header className="bg-[#131822] border-b border-slate-800 sticky top-0 z-50 px-3 sm:px-6 py-3.5 flex items-center justify-between shadow-md">
       {/* Brand Logo */}
       <div 
         className="flex items-center gap-2 cursor-pointer" 
@@ -89,7 +92,7 @@ export default function Navbar() {
       </div>
 
       {/* Navigation Actions */}
-      <div className="flex items-center gap-2 sm:gap-3 relative" ref={dropdownRef}>
+      <div className="flex items-center gap-2 relative" ref={dropdownRef}>
         <button
           onClick={() => router.push('/dashboard')}
           className="bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition items-center gap-1.5 cursor-pointer border border-slate-700 hidden sm:flex"
@@ -99,9 +102,9 @@ export default function Navbar() {
 
         <button
           onClick={() => router.push('/cart')}
-          className="bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
+          className="bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
         >
-          <ShoppingCart size={15} className="text-blue-400" /> Cart
+          <ShoppingCart size={15} className="text-blue-400" /> <span className="hidden xs:inline">Cart</span>
         </button>
 
         {/* Dynamic User Authentication Dropdown Menu */}
@@ -109,24 +112,35 @@ export default function Navbar() {
           user ? (
             <div className="relative">
               <button
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600/30 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDropdownOpen((prev) => !prev);
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDropdownOpen((prev) => !prev);
+                }}
+                className="bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600/30 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer select-none"
               >
-                <User size={15} /> 
-                <span className="truncate max-w-[80px] sm:max-w-none">{userName}</span>
-                <ChevronDown size={14} />
+                <User size={15} className="shrink-0" /> 
+                <span className="truncate max-w-[70px] sm:max-w-none">{userName}</span>
+                <ChevronDown size={14} className="shrink-0" />
               </button>
 
-              {/* Mobile-Friendly Dropdown Box with forced Dark Background & Light Text */}
+              {/* Mobile-Friendly Dropdown Box */}
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-[#131822] text-slate-100 border border-slate-700 rounded-2xl shadow-2xl py-2 z-50 text-xs space-y-1">
+                <div className="absolute right-0 mt-2 w-48 bg-[#131822] text-slate-100 border border-slate-700 rounded-2xl shadow-2xl py-2 z-50 text-xs space-y-1">
                   <button
+                    type="button"
                     onClick={() => { setDropdownOpen(false); router.push('/dashboard'); }}
                     className="w-full text-left px-4 py-2.5 text-slate-100 hover:bg-slate-800 transition flex items-center gap-2 cursor-pointer font-medium"
                   >
                     <User size={14} className="text-blue-400" /> My Profile
                   </button>
                   <button
+                    type="button"
                     onClick={() => { setDropdownOpen(false); router.push('/dashboard'); }}
                     className="w-full text-left px-4 py-2.5 text-slate-100 hover:bg-slate-800 transition flex items-center gap-2 cursor-pointer font-medium"
                   >
@@ -134,6 +148,7 @@ export default function Navbar() {
                   </button>
                   <div className="border-t border-slate-800 my-1"></div>
                   <button
+                    type="button"
                     onClick={handleLogout}
                     className="w-full text-left px-4 py-2.5 text-red-400 hover:bg-red-500/10 transition flex items-center gap-2 cursor-pointer font-medium"
                   >
