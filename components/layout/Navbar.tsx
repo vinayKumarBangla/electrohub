@@ -1,55 +1,76 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import Link from 'next/link'
+import Link from 'next/link';
+import { useCart } from '@/context/CartContext';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function Navbar() {
-  const [role, setRole] = useState<string | null>(null)
-  const [userEmail, setUserEmail] = useState<string | null>(null)
-  const supabase = createClient()
+  const { totalItems } = useCart();
+  const [searchTerm, setSearchTerm] = useState('');
+  const router = useRouter();
 
-  useEffect(() => {
-    async function getUserProfile() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setUserEmail(user.email ?? null)
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single()
-        setRole(profile?.role || 'customer')
-      }
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
     }
-    getUserProfile()
-  }, [supabase])
+  };
 
   return (
-    <header className="sticky top-0 z-50 bg-white/80 premium-blur border-b border-dark-100">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        <Link href="/" className="font-extrabold text-xl tracking-tight text-dark-900">
-          Tech<span className="text-brand-500">Cart OS</span>
-        </Link>
-
-        <div className="flex items-center gap-6 text-sm font-semibold">
-          <Link href="/" className="text-dark-600 hover:text-dark-900">Store</Link>
-          
-          {role && role !== 'customer' && (
-            <Link href={`/${role}`} className="px-3 py-1 bg-dark-100 text-dark-800 rounded uppercase text-xs">
-              {role} Panel
-            </Link>
-          )}
-
-          {userEmail ? (
-            <span className="text-xs text-dark-500">{userEmail}</span>
-          ) : (
-            <Link href="/login" className="bg-dark-900 text-white text-xs px-4 py-2 rounded-lg hover:bg-dark-800">
-              Sign In
-            </Link>
-          )}
+    <header className="bg-flipkart-blue text-white sticky top-0 z-50 shadow-md">
+      <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between gap-4">
+        
+        {/* Left: Brand Logo */}
+        <div className="flex items-center gap-6">
+          <Link href="/" className="flex flex-col items-start leading-none">
+            <span className="text-xl font-black italic tracking-wide text-white">
+              Electro<span className="text-flipkart-yellow">Hub</span>
+            </span>
+            <span className="text-[10px] italic text-gray-200 flex items-center gap-0.5 mt-0.5">
+              Explore <span className="text-flipkart-yellow font-bold">Plus</span>
+              <span className="text-flipkart-yellow font-bold text-xs">✦</span>
+            </span>
+          </Link>
         </div>
+
+        {/* Center: Search Bar */}
+        <form onSubmit={handleSearch} className="flex-1 max-w-2xl relative">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search for electronics, mobiles, laptops and more..."
+            className="w-full py-2 px-4 pr-10 text-sm text-gray-800 bg-white rounded-sm focus:outline-none shadow-inner"
+          />
+          <button type="submit" className="absolute right-3 top-2.5 text-flipkart-blue font-bold">
+            🔍
+          </button>
+        </form>
+
+        {/* Right: Actions (Seller, Login, Cart) */}
+        <div className="flex items-center gap-6 text-sm font-semibold">
+          <Link
+            href="/dashboard"
+            className="hidden md:inline-block bg-white text-flipkart-blue px-4 py-1.5 rounded-sm font-bold hover:bg-gray-100 transition shadow-sm"
+          >
+            Become a Seller
+          </Link>
+
+          <Link href="/cart" className="flex items-center gap-2 hover:text-gray-200 relative">
+            <div className="relative">
+              <span className="text-xl">🛒</span>
+              {totalItems > 0 && (
+                <span className="absolute -top-2 -right-2 bg-flipkart-amber text-slate-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full border border-white">
+                  {totalItems}
+                </span>
+              )}
+            </div>
+            <span>Cart</span>
+          </Link>
+        </div>
+
       </div>
     </header>
-  )
+  );
 }

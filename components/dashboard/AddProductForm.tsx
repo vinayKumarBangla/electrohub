@@ -1,319 +1,250 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { supabase } from '@/lib/supabase/client';
 
-const supabase = createClient();
-
-type Brand = {
-  id: string;
-  name: string;
-};
-
-type Category = {
-  id: string;
-  name: string;
-};
+const CATEGORIES = [
+  'Smartphones',
+  'Laptops',
+  'Audio',
+  'Smartwatches',
+  'Gaming',
+  'Accessories',
+  'Components',
+];
 
 export default function AddProductForm() {
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-
-  const [brandId, setBrandId] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-
-  const [price, setPrice] = useState("");
-  const [discountPrice, setDiscountPrice] = useState("");
-
-  const [sku, setSku] = useState("");
-  const [stock, setStock] = useState("");
-
-  const [image, setImage] = useState<File | null>(null);
-
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const [formData, setFormData] = useState({
+    title: '',
+    category: CATEGORIES[0],
+    price: '',
+    description: '',
+    image_url: '',
+  });
 
- async function loadData() {
-  const { data: brandData, error: brandError } = await supabase
-    .from("brands")
-    .select("*");
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
 
-  console.log("Brands:", brandData);
-  console.log("Brand Error:", brandError);
-
-  const { data: categoryData, error: categoryError } = await supabase
-    .from("categories")
-    .select("*");
-
-  console.log("Categories:", categoryData);
-  console.log("Category Error:", categoryError);
-
-  if (brandData) {
-    setBrands(brandData);
-  }
-
-  if (categoryData) {
-    setCategories(categoryData);
-  }
-}
-
-  async function handleSave() {
-    if (
-      !name ||
-      !brandId ||
-      !categoryId ||
-      !price ||
-      !sku ||
-      !stock
-    ) {
-      alert("Please fill all required fields");
-      return;
-    }
-
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
+    setErrorMsg('');
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      alert("Please login first");
+    if (!formData.title || !formData.price) {
+      setErrorMsg('Please fill in required fields (Title and Price).');
       setLoading(false);
       return;
     }
 
-    const slug = name
+    // Generate a clean URL slug from the title
+    const slug = formData.title
       .toLowerCase()
-      .replace(/\s+/g, "-");
-          const { data: product, error } = await supabase
-      .from("products")
-      .insert({
-        seller_id: user.id,
-        category_id: categoryId,
-        brand_id: brandId,
-        name,
-        slug,
-        description,
-        price: Number(price),
-        discount_price: discountPrice
-          ? Number(discountPrice)
-          : null,
-        sku,
-      })
-      .select()
-      .single();
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+
+    const productPayload = {
+      title: formData.title,
+      name: formData.title, // Backup field for legacy schema support
+      category: formData.category,
+      price: parseFloat(formData.price) || 0,
+      description: formData.description,
+      image_url: formData.image_url,
+      images: formData.image_url ? [formData.image_url] : [],
+      slug: `${slug}-${Date.now().toString().slice(-4)}`,
+    };
+
+    const { error } = await supabase.from('products').insert([productPayload]);
 
     if (error) {
-      alert(error.message);
+      console.error('Error inserting product:', error);
+      setErrorMsg(error.message || 'Failed to create product.');
       setLoading(false);
       return;
     }
 
-    await supabase.from("inventory").insert({
-      product_id: product.id,
-      quantity: Number(stock),
-    });
+    router.push('/dashboard/products');
+    router.refresh();
+  };
 
-   if (image) {
-  const fileName = `${Date.now()}-${image.name}`;
-
-  const {
-    data: uploadData,
-    error: uploadError,
-  } = await supabase.storage
-    .from("product-images")
-    .upload(fileName, image);
-
-  console.log("Upload Data:", uploadData);
-  console.log("Upload Error:", uploadError);
-
-  if (!uploadError) {
-    const { data } = supabase.storage
-      .from("product-images")
-      .getPublicUrl(fileName);
-
-    console.log("Public URL:", data.publicUrl);
-
-    const { error: imageError } = await supabase
-      .from("product_images")
-      .insert({
-        product_id: product.id,
-        image_url: data.publicUrl,
-      });
-
-    console.log("Image Insert Error:", imageError);
-  }
-}
-    alert("Product Added Successfully!");
-
-    setName("");
-    setDescription("");
-    setBrandId("");
-    setCategoryId("");
-    setPrice("");
-    setDiscountPrice("");
-    setSku("");
-    setStock("");
-    setImage(null);
-
-    setLoading(false);
-  }
+  const previewImage =
+    formData.image_url ||
+    'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?auto=format&fit=crop&w=600&q=80';
 
   return (
-    <div className="rounded-2xl bg-white p-8 shadow-lg">
-      <div className="grid gap-6 md:grid-cols-2">
-
-        <div>
-          <label className="mb-2 block font-medium">
-            Product Name
-          </label>
-
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="iPhone 16 Pro"
-            className="w-full rounded-xl border p-3 outline-none"
-          />
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6 sm:p-12">
+      <div className="max-w-5xl mx-auto space-y-8">
+        
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+          <div>
+            <span className="text-xs font-semibold uppercase tracking-widest text-indigo-400">
+              Vendor Management
+            </span>
+            <h1 className="text-3xl font-bold text-white mt-1">List New Product</h1>
+            <p className="text-xs text-slate-400 mt-1">
+              Add a new product to the ElectroHub catalog.
+            </p>
+          </div>
+          <Link
+            href="/dashboard/products"
+            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold text-xs border border-slate-800 transition-colors inline-block text-center"
+          >
+            &larr; Back to Inventory
+          </Link>
         </div>
 
-        <div>
-          <label className="mb-2 block font-medium">
-            SKU
-          </label>
+        {errorMsg && (
+          <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-medium">
+            {errorMsg}
+          </div>
+        )}
 
-          <input
-            type="text"
-            value={sku}
-            onChange={(e) => setSku(e.target.value)}
-            placeholder="IPH16PRO"
-            className="w-full rounded-xl border p-3 outline-none"
-          />
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* Form Controls */}
+          <form onSubmit={handleSubmit} className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                Product Title <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="title"
+                required
+                value={formData.title}
+                onChange={handleChange}
+                placeholder="e.g. Wireless Noise Cancelling Headphones"
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600"
+              />
+            </div>
 
-        <div className="md:col-span-2">
-          <label className="mb-2 block font-medium">
-            Description
-          </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                  Category
+                </label>
+                <select
+                  name="category"
+                  value={formData.category}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs focus:outline-none focus:border-indigo-500 transition-colors cursor-pointer"
+                >
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat} className="bg-slate-900 text-slate-100">
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <textarea
-            rows={4}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Product description..."
-            className="w-full rounded-xl border p-3 outline-none"
-          />
-        </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                  Price ($) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="price"
+                  required
+                  value={formData.price}
+                  onChange={handleChange}
+                  placeholder="299.99"
+                  className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                Image URL
+              </label>
+              <input
+                type="url"
+                name="image_url"
+                value={formData.image_url}
+                onChange={handleChange}
+                placeholder="https://images.unsplash.com/photo-..."
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                Description
+              </label>
+              <textarea
+                name="description"
+                rows={4}
+                value={formData.description}
+                onChange={handleChange}
+                placeholder="Highlight key specs, features, and condition..."
+                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-slate-100 text-xs focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-600 resize-none"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Publishing Item...' : 'Publish Product to Store'}
+            </button>
+          </form>
+
+          {/* Live Card Preview */}
+          <div className="lg:col-span-5 space-y-3">
+            <span className="text-xs font-semibold uppercase tracking-widest text-indigo-400 block">
+              Live Card Preview
+            </span>
+            <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl p-4 space-y-4">
+              <div className="aspect-square bg-slate-950 rounded-xl overflow-hidden relative border border-slate-800/80">
+                <img
+                  src={previewImage}
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                />
+                <span className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md border border-slate-800 text-slate-300 text-[10px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md">
+                  {formData.category}
+                </span>
+              </div>
+
+              <div>
+                <h3 className="font-semibold text-slate-100 text-sm line-clamp-1">
+                  {formData.title || 'Product Title Preview'}
+                </h3>
+                <p className="text-slate-400 text-xs line-clamp-2 mt-1">
+                  {formData.description || 'Description snippet will display here...'}
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-between">
                 <div>
-          <label className="mb-2 block font-medium">
-            Brand
-          </label>
+                  <span className="text-[10px] text-slate-500 font-medium block uppercase tracking-wider">
+                    Price
+                  </span>
+                  <span className="text-base font-bold text-white">
+                    ${formData.price ? parseFloat(formData.price).toFixed(2) : '0.00'}
+                  </span>
+                </div>
+                <span className="px-3 py-1.5 rounded-lg bg-indigo-600/10 text-indigo-400 text-xs font-semibold border border-indigo-500/20">
+                  Preview
+                </span>
+              </div>
+            </div>
+          </div>
 
-          <select
-            value={brandId}
-            onChange={(e) => setBrandId(e.target.value)}
-            className="w-full rounded-xl border p-3"
-          >
-            <option value="">Select Brand</option>
-
-            {brands.map((brand) => (
-              <option key={brand.id} value={brand.id}>
-                {brand.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="mb-2 block font-medium">
-            Category
-          </label>
-
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            className="w-full rounded-xl border p-3"
-          >
-            <option value="">Select Category</option>
-
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="mb-2 block font-medium">
-            Price
-          </label>
-
-          <input
-            type="number"
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            placeholder="1000"
-            className="w-full rounded-xl border p-3 outline-none"
-          />
-        </div>
-
-        <div>
-          <label className="mb-2 block font-medium">
-            Discount Price
-          </label>
-
-          <input
-            type="number"
-            value={discountPrice}
-            onChange={(e) => setDiscountPrice(e.target.value)}
-            placeholder="900"
-            className="w-full rounded-xl border p-3 outline-none"
-          />
-        </div>
-
-        <div>
-          <label className="mb-2 block font-medium">
-            Stock
-          </label>
-
-          <input
-            type="number"
-            value={stock}
-            onChange={(e) => setStock(e.target.value)}
-            placeholder="50"
-            className="w-full rounded-xl border p-3 outline-none"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="mb-2 block font-medium">
-            Product Image
-          </label>
-
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) =>
-              setImage(e.target.files?.[0] || null)
-            }
-            className="w-full rounded-xl border p-3"
-          />
-        </div>
-                <div className="md:col-span-2">
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            className="w-full rounded-xl bg-blue-600 py-4 text-lg font-semibold text-white transition hover:bg-blue-700"
-          >
-            {loading ? "Saving..." : "Save Product"}
-          </button>
         </div>
 
       </div>

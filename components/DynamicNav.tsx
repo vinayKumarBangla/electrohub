@@ -1,84 +1,94 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import Link from 'next/link';
+import { useCart } from '@/context/CartContext';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function DynamicNav() {
-  const [role, setRole] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [userEmail, setUserEmail] = useState<string | null>(null)
-  const supabase = createClient()
-  const pathname = usePathname()
+  const { totalItems } = useCart();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [user, setUser] = useState<{ email: string } | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
-    async function loadUserProfile() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setUserEmail(user.email ?? null)
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single()
-        setRole(profile?.role || 'customer')
+    // Check logged-in user from localStorage
+    const savedUser = localStorage.getItem('electrohub_user');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        console.error(e);
       }
-      setLoading(false)
     }
-    loadUserProfile()
-  }, [supabase])
+  }, []);
 
-  const navLinks = [
-    { name: 'Catalogue', href: '/' },
-    { name: 'Best Sellers', href: '/featured' },
-  ]
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchTerm)}`);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('electrohub_user');
+    setUser(null);
+    router.push('/login');
+  };
 
   return (
-    <header className="sticky top-0 z-50 bg-white premium-blur border-b border-dark-100 shadow-subtle">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        {/* Brand Logo - Strong and Clean */}
-        <Link href="/" className="font-extrabold text-lg md:text-xl tracking-tighter text-dark-900 group">
-          Tech<span className="text-brand-500 transition-colors group-hover:text-brand-600">Cart OS</span>
+    <header className="bg-flipkart-blue text-white sticky top-0 z-50 shadow-md">
+      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        
+        {/* Logo */}
+        <Link href="/" className="flex flex-col items-start">
+          <span className="text-xl font-extrabold italic tracking-wider text-amber-300">TechCart OS</span>
+          <span className="text-[10px] text-gray-200 italic -mt-1">Explore <span className="text-yellow-300 font-semibold">Plus</span></span>
         </Link>
 
-        {/* Dynamic Desktop Links */}
-        {!loading && (
-          <nav className="flex items-center gap-6 md:gap-8 text-sm font-medium">
-            {navLinks.map(link => (
-              <Link key={link.href} href={link.href} className={`hover:text-dark-900 ${pathname === link.href ? 'text-dark-900 font-semibold' : 'text-dark-600'}`}>
-                {link.name}
-              </Link>
-            ))}
-            
-            {/* Role-Specific Panels (Only if authorized) */}
-            {role && role !== 'customer' && (
-              <Link href={`/${role}`} className="px-3 py-1 text-xs font-semibold rounded bg-dark-100 text-dark-700 hover:bg-dark-200 uppercase tracking-wide">
-                {role} Console
-              </Link>
-            )}
-          </nav>
-        )}
+        {/* Search Bar */}
+        <form onSubmit={handleSearch} className="flex-1 max-w-2xl flex items-center bg-white rounded-sm overflow-hidden shadow-sm">
+          <input
+            type="text"
+            placeholder="Search for products, brands and more"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-2 text-xs text-gray-800 outline-none"
+          />
+          <button type="submit" className="bg-white px-4 text-flipkart-blue hover:text-amber-500">
+            🔍
+          </button>
+        </form>
 
-        {/* User Actions Section */}
-        <div className="flex items-center gap-4 text-sm">
-          {!loading && userEmail ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-dark-500 hidden sm:inline">{userEmail}</span>
-              <Link href="/cart" className="relative group">
-                {/* Minimalist Cart Icon */}
-                <svg className="w-5 h-5 text-dark-600 hover:text-dark-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </Link>
+        {/* Nav Actions */}
+        <div className="flex items-center space-x-6 text-xs font-bold">
+          {user ? (
+            <div className="relative group cursor-pointer flex items-center gap-1 bg-white text-flipkart-blue px-3 py-1.5 rounded-sm shadow">
+              <span>👤 {user.email.split('@')[0]}</span>
+              <div className="absolute top-full right-0 bg-white text-gray-800 shadow-md rounded-sm py-2 w-36 hidden group-hover:block border">
+                <Link href="/profile" className="block px-4 py-2 hover:bg-gray-100">My Profile</Link>
+                <Link href="/track-order" className="block px-4 py-2 hover:bg-gray-100">Orders</Link>
+                <button onClick={handleLogout} className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100">Logout</button>
+              </div>
             </div>
           ) : (
-            <Link href="/login" className="bg-dark-900 hover:bg-dark-800 text-white text-xs font-semibold px-5 py-2 rounded-lg transition-colors duration-200">
-              Sign In
+            <Link href="/login" className="bg-white text-flipkart-blue px-6 py-1.5 rounded-sm shadow hover:bg-gray-100 uppercase">
+              Login
             </Link>
           )}
+
+          <Link href="/cart" className="flex items-center gap-1 hover:text-amber-300 relative">
+            <span className="text-lg">🛒</span>
+            <span>Cart</span>
+            {totalItems > 0 && (
+              <span className="absolute -top-2 -right-3 bg-red-600 text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full">
+                {totalItems}
+              </span>
+            )}
+          </Link>
         </div>
+
       </div>
     </header>
-  )
+  );
 }

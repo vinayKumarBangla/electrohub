@@ -1,31 +1,28 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import Navbar from "@/components/layout/Navbar";
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import DynamicNav from '@/components/DynamicNav';
+import { CartProvider } from '@/context/CartContext';
 
-const inter = Inter({ 
-  subsets: ["latin"], 
-  variable: "--font-inter",
-});
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "TechCart OS | Premium On-Demand Electronics Platform",
-  description: "Experience professional-grade electronics shopping with live tracking.",
+  title: 'TechCart OS - Electronics Store',
+  description: 'Shop top mobiles, laptops, audio and appliances',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en" className={inter.variable}>
-      <body className="font-sans min-h-screen flex flex-col bg-dark-50 text-dark-900">
-        <Navbar />
-        <div className="flex-grow">{children}</div>
-        <footer className="border-t border-dark-100 bg-white mt-12 py-8 text-center text-xs text-dark-500">
-          TechCart OS © {new Date().getFullYear()} - Professional E-Commerce Platform.
-        </footer>
+    <html lang="en">
+      <body className={`${inter.className} bg-[#0b0f19] text-gray-900 min-h-screen flex flex-col`}>
+        <CartProvider>
+          <DynamicNav />
+          <main className="flex-1">{children}</main>
+        </CartProvider>
       </body>
     </html>
   );
