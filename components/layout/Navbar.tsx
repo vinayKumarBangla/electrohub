@@ -47,6 +47,7 @@ export default function Navbar() {
       } else {
         setUser(null);
         setUserName('');
+        setDropdownOpen(false);
       }
       setLoading(false);
     });
@@ -74,13 +75,15 @@ export default function Navbar() {
     );
     await supabase.auth.signOut();
     localStorage.removeItem('electrohub_user');
+    setUser(null);
+    setUserName('');
     setDropdownOpen(false);
     router.push('/login');
     router.refresh();
   };
 
   return (
-    <header className="bg-[#131822] border-b border-slate-800 sticky top-0 z-50 px-3 sm:px-6 py-3.5 flex items-center justify-between shadow-md">
+    <header className="bg-[#131822] border-b border-slate-800 sticky top-0 z-[100] px-3 sm:px-6 py-3.5 flex items-center justify-between shadow-md">
       {/* Brand Logo */}
       <div 
         className="flex items-center gap-2 cursor-pointer" 
@@ -92,7 +95,7 @@ export default function Navbar() {
       </div>
 
       {/* Navigation Actions */}
-      <div className="flex items-center gap-2 relative">
+      <div className="flex items-center gap-2">
         <button
           onClick={() => router.push('/dashboard')}
           className="bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition items-center gap-1.5 cursor-pointer border border-slate-700 hidden sm:flex"
@@ -113,7 +116,10 @@ export default function Navbar() {
             <div className="relative" ref={dropdownRef}>
               <button
                 type="button"
-                onClick={() => setDropdownOpen(!dropdownOpen)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDropdownOpen((prev) => !prev);
+                }}
                 className="bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600/30 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer select-none"
               >
                 <User size={15} className="shrink-0" /> 
@@ -123,7 +129,7 @@ export default function Navbar() {
 
               {/* Mobile-Friendly Dropdown Box */}
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-[#1b2230] text-slate-100 border border-slate-700 rounded-2xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.8)] py-2 z-[9999] text-xs space-y-1">
+                <div className="absolute right-0 mt-2 w-48 bg-[#1b2230] text-slate-100 border border-slate-700 rounded-2xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.9)] py-2 z-[99999] text-xs space-y-1">
                   <button
                     type="button"
                     onClick={() => { setDropdownOpen(false); router.push('/dashboard'); }}
