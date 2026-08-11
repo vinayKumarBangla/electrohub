@@ -92,7 +92,7 @@ export default function Navbar() {
       </div>
 
       {/* Navigation Actions */}
-      <div className="flex items-center gap-2 relative" ref={dropdownRef}>
+      <div className="flex items-center gap-2 relative">
         <button
           onClick={() => router.push('/dashboard')}
           className="bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition items-center gap-1.5 cursor-pointer border border-slate-700 hidden sm:flex"
@@ -110,18 +110,10 @@ export default function Navbar() {
         {/* Dynamic User Authentication Dropdown Menu */}
         {!loading && (
           user ? (
-            <div className="relative">
+            <div className="relative" ref={dropdownRef}>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDropdownOpen((prev) => !prev);
-                }}
-                onTouchEnd={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setDropdownOpen((prev) => !prev);
-                }}
+                onClick={() => setDropdownOpen(!dropdownOpen)}
                 className="bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600/30 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer select-none"
               >
                 <User size={15} className="shrink-0" /> 
@@ -131,28 +123,28 @@ export default function Navbar() {
 
               {/* Mobile-Friendly Dropdown Box */}
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-[#131822] text-slate-100 border border-slate-700 rounded-2xl shadow-2xl py-2 z-50 text-xs space-y-1">
+                <div className="absolute right-0 mt-2 w-48 bg-[#1b2230] text-slate-100 border border-slate-700 rounded-2xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.8)] py-2 z-[9999] text-xs space-y-1">
                   <button
                     type="button"
                     onClick={() => { setDropdownOpen(false); router.push('/dashboard'); }}
-                    className="w-full text-left px-4 py-2.5 text-slate-100 hover:bg-slate-800 transition flex items-center gap-2 cursor-pointer font-medium"
+                    className="w-full text-left px-4 py-3 text-slate-100 hover:bg-slate-800 transition flex items-center gap-2.5 cursor-pointer font-medium"
                   >
-                    <User size={14} className="text-blue-400" /> My Profile
+                    <User size={15} className="text-blue-400" /> My Profile
                   </button>
                   <button
                     type="button"
                     onClick={() => { setDropdownOpen(false); router.push('/dashboard'); }}
-                    className="w-full text-left px-4 py-2.5 text-slate-100 hover:bg-slate-800 transition flex items-center gap-2 cursor-pointer font-medium"
+                    className="w-full text-left px-4 py-3 text-slate-100 hover:bg-slate-800 transition flex items-center gap-2.5 cursor-pointer font-medium"
                   >
-                    <Package size={14} className="text-blue-400" /> Orders
+                    <Package size={15} className="text-blue-400" /> Orders
                   </button>
                   <div className="border-t border-slate-800 my-1"></div>
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="w-full text-left px-4 py-2.5 text-red-400 hover:bg-red-500/10 transition flex items-center gap-2 cursor-pointer font-medium"
+                    className="w-full text-left px-4 py-3 text-red-400 hover:bg-red-500/10 transition flex items-center gap-2.5 cursor-pointer font-medium"
                   >
-                    <LogOut size={14} /> Logout
+                    <LogOut size={15} /> Logout
                   </button>
                 </div>
               )}
