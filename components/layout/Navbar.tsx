@@ -1,75 +1,156 @@
 'use client';
 
-import Link from 'next/link';
-import { useCart } from '@/context/CartContext';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
+import { ShoppingCart, User, LogIn, Package, LogOut, ChevronDown } from 'lucide-react';
 
 export default function Navbar() {
-  const { totalItems } = useCart();
-  const [searchTerm, setSearchTerm] = useState('');
   const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [userName, setUserName] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchTerm.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
+  useEffect(() => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    async function getInitialSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        setUserName(
+          session.user.user_metadata?.full_name || 
+          session.user.user_metadata?.name || 
+          session.user.email?.split('@')[0] || 
+          'Account'
+        );
+      }
+      setLoading(false);
     }
+
+    getInitialSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        setUserName(
+          session.user.user_metadata?.full_name || 
+          session.user.user_metadata?.name || 
+          session.user.email?.split('@')[0] || 
+          'Account'
+        );
+      } else {
+        setUser(null);
+        setUserName('');
+      }
+      setLoading(false);
+    });
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    await supabase.auth.signOut();
+    localStorage.removeItem('electrohub_user');
+    setDropdownOpen(false);
+    router.push('/login');
+    router.refresh();
   };
 
   return (
-    <header className="bg-flipkart-blue text-white sticky top-0 z-50 shadow-md">
-      <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center justify-between gap-4">
-        
-        {/* Left: Brand Logo */}
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex flex-col items-start leading-none">
-            <span className="text-xl font-black italic tracking-wide text-white">
-              Electro<span className="text-flipkart-yellow">Hub</span>
-            </span>
-            <span className="text-[10px] italic text-gray-200 flex items-center gap-0.5 mt-0.5">
-              Explore <span className="text-flipkart-yellow font-bold">Plus</span>
-              <span className="text-flipkart-yellow font-bold text-xs">✦</span>
-            </span>
-          </Link>
-        </div>
+    <header className="bg-[#131822] border-b border-slate-800 sticky top-0 z-50 px-4 sm:px-6 py-3.5 flex items-center justify-between shadow-md">
+      {/* Brand Logo */}
+      <div 
+        className="flex items-center gap-2 cursor-pointer" 
+        onClick={() => router.push('/')}
+      >
+        <span className="text-lg sm:text-xl font-black text-white">
+          TechCart <span className="text-blue-500">OS</span>
+        </span>
+      </div>
 
-        {/* Center: Search Bar */}
-        <form onSubmit={handleSearch} className="flex-1 max-w-2xl relative">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search for electronics, mobiles, laptops and more..."
-            className="w-full py-2 px-4 pr-10 text-sm text-gray-800 bg-white rounded-sm focus:outline-none shadow-inner"
-          />
-          <button type="submit" className="absolute right-3 top-2.5 text-flipkart-blue font-bold">
-            🔍
-          </button>
-        </form>
+      {/* Navigation Actions */}
+      <div className="flex items-center gap-2 sm:gap-3 relative" ref={dropdownRef}>
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition items-center gap-1.5 cursor-pointer border border-slate-700 hidden sm:flex"
+        >
+          <Package size={15} className="text-blue-400" /> My Orders
+        </button>
 
-        {/* Right: Actions (Seller, Login, Cart) */}
-        <div className="flex items-center gap-6 text-sm font-semibold">
-          <Link
-            href="/dashboard"
-            className="hidden md:inline-block bg-white text-flipkart-blue px-4 py-1.5 rounded-sm font-bold hover:bg-gray-100 transition shadow-sm"
-          >
-            Become a Seller
-          </Link>
+        <button
+          onClick={() => router.push('/cart')}
+          className="bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-slate-700"
+        >
+          <ShoppingCart size={15} className="text-blue-400" /> Cart
+        </button>
 
-          <Link href="/cart" className="flex items-center gap-2 hover:text-gray-200 relative">
+        {/* Dynamic User Authentication Dropdown Menu */}
+        {!loading && (
+          user ? (
             <div className="relative">
-              <span className="text-xl">🛒</span>
-              {totalItems > 0 && (
-                <span className="absolute -top-2 -right-2 bg-flipkart-amber text-slate-900 text-[10px] font-extrabold px-1.5 py-0.5 rounded-full border border-white">
-                  {totalItems}
-                </span>
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600/30 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <User size={15} /> 
+                <span className="truncate max-w-[80px] sm:max-w-none">{userName}</span>
+                <ChevronDown size={14} />
+              </button>
+
+              {/* Mobile-Friendly Dropdown Box with forced Dark Background & Light Text */}
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-[#131822] text-slate-100 border border-slate-700 rounded-2xl shadow-2xl py-2 z-50 text-xs space-y-1">
+                  <button
+                    onClick={() => { setDropdownOpen(false); router.push('/dashboard'); }}
+                    className="w-full text-left px-4 py-2.5 text-slate-100 hover:bg-slate-800 transition flex items-center gap-2 cursor-pointer font-medium"
+                  >
+                    <User size={14} className="text-blue-400" /> My Profile
+                  </button>
+                  <button
+                    onClick={() => { setDropdownOpen(false); router.push('/dashboard'); }}
+                    className="w-full text-left px-4 py-2.5 text-slate-100 hover:bg-slate-800 transition flex items-center gap-2 cursor-pointer font-medium"
+                  >
+                    <Package size={14} className="text-blue-400" /> Orders
+                  </button>
+                  <div className="border-t border-slate-800 my-1"></div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2.5 text-red-400 hover:bg-red-500/10 transition flex items-center gap-2 cursor-pointer font-medium"
+                  >
+                    <LogOut size={14} /> Logout
+                  </button>
+                </div>
               )}
             </div>
-            <span>Cart</span>
-          </Link>
-        </div>
-
+          ) : (
+            <button
+              onClick={() => router.push('/login')}
+              className="bg-blue-600 hover:bg-blue-500 text-white px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-lg"
+            >
+              <LogIn size={15} /> Login
+            </button>
+          )
+        )}
       </div>
     </header>
   );

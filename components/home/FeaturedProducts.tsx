@@ -51,7 +51,7 @@ export default async function FeaturedProducts() {
           {products?.map((product) => (
             <ProductCard
               key={product.id}
-              product={product}
+              item={product}
             />
           ))}
 

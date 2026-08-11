@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Package, Clock, ChevronDown, ChevronUp, RefreshCw, X, Truck } from 'lucide-react';
+import { createBrowserClient } from '@supabase/ssr';
+import { Plus, Package, Clock, ChevronDown, ChevronUp, RefreshCw, X, Truck, Bike, Mail } from 'lucide-react';
 
 interface OrderItem {
   id: string;
@@ -23,6 +24,7 @@ interface Order {
   status: string;
   reverseTrackingId?: string;
   scheduledPickup?: string;
+  pickupOtp?: string;
   shippingAddress?: {
     fullName: string;
     phone: string;
@@ -43,25 +45,66 @@ export default function DashboardPage() {
   const [actionType, setActionType] = useState<'Return' | 'Replace'>('Return');
   const [returnReason, setReturnReason] = useState('Defective / Damaged Item');
   const [loadingBackend, setLoadingBackend] = useState(false);
+  const [currentUserStorageKey, setCurrentUserStorageKey] = useState<string>('orders_guest');
 
   useEffect(() => {
-    const savedOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-    setOrders(savedOrders);
+    async function loadUserOrders() {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
 
-    const timer = setTimeout(() => {
-      const currentOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-      const updatedOrders = currentOrders.map((ord: Order) => {
-        if (ord.status === 'Processing' || ord.status === 'Shipped') {
-          return { ...ord, status: 'Delivered' };
+      const { data: { user } } = await supabase.auth.getUser();
+      const storageKey = user ? `orders_${user.id}` : 'orders_guest';
+      setCurrentUserStorageKey(storageKey);
+
+      // 1. Try fetching orders from Supabase database filtered by user_id
+      if (user) {
+        const { data: dbOrders, error } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('user_id', user.id);
+
+        if (!error && dbOrders && dbOrders.length > 0) {
+          const formattedDbOrders = dbOrders.map((o: any) => ({
+            orderId: o.order_id,
+            items: o.items || [],
+            totalAmount: Number(o.total_amount),
+            paymentMethod: o.payment_method,
+            date: new Date(o.created_at).toLocaleDateString(),
+            status: o.status,
+            reverseTrackingId: o.reverse_tracking_id,
+            scheduledPickup: o.scheduled_pickup,
+            pickupOtp: o.pickup_otp,
+            shippingAddress: o.shipping_address
+          }));
+          setOrders(formattedDbOrders);
+          return;
         }
-        return ord;
-      });
+      }
 
-      setOrders(updatedOrders);
-      localStorage.setItem('orders', JSON.stringify(updatedOrders));
-    }, 10000);
+      // 2. Fallback to user-specific localStorage key
+      const savedOrders = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      setOrders(savedOrders);
 
-    return () => clearTimeout(timer);
+      // Simulate status progression timer for local/fallback orders
+      const timer = setTimeout(() => {
+        const currentOrders = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        const updatedOrders = currentOrders.map((ord: Order) => {
+          if (ord.status === 'Processing' || ord.status === 'Shipped') {
+            return { ...ord, status: 'Delivered' };
+          }
+          return ord;
+        });
+
+        setOrders(updatedOrders);
+        localStorage.setItem(storageKey, JSON.stringify(updatedOrders));
+      }, 10000);
+
+      return () => clearTimeout(timer);
+    }
+
+    loadUserOrders();
   }, []);
 
   const toggleExpand = (orderId: string) => {
@@ -94,15 +137,16 @@ export default function DashboardPage() {
               ...ord, 
               status: result.data.newStatus,
               reverseTrackingId: result.data.reverseTrackingId,
-              scheduledPickup: result.data.scheduledPickup
+              scheduledPickup: result.data.scheduledPickup,
+              pickupOtp: result.data.pickupOtp
             };
           }
           return ord;
         });
 
         setOrders(updatedOrders);
-        localStorage.setItem('orders', JSON.stringify(updatedOrders));
-        alert(`Success! ${result.message}\nPickup scheduled for: ${result.data.scheduledPickup}`);
+        localStorage.setItem(currentUserStorageKey, JSON.stringify(updatedOrders));
+        alert(`Success! ${result.message}\nPickup OTP: ${result.data.pickupOtp}\nPickup scheduled for: ${result.data.scheduledPickup}`);
       } else {
         alert('Failed to process request: ' + result.message);
       }
@@ -157,16 +201,30 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#0a0e17] text-slate-100 flex flex-col justify-between">
       <div className="p-8 relative max-w-4xl mx-auto w-full space-y-6">
         
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h1 className="text-2xl font-black text-white flex items-center gap-2">
             Order <span className="text-blue-500">Dashboard</span>
           </h1>
-          <button 
-            onClick={() => router.push('/')}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg flex items-center gap-2 cursor-pointer"
-          >
-            <Plus size={16} /> Place New Order
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button 
+              onClick={() => router.push('/notifications')}
+              className="bg-slate-800 hover:bg-slate-700 text-blue-400 font-bold text-xs px-3 py-2.5 rounded-xl border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Mail size={16} /> Notifications
+            </button>
+            <button 
+              onClick={() => router.push('/rider')}
+              className="bg-slate-800 hover:bg-slate-700 text-blue-400 font-bold text-xs px-3 py-2.5 rounded-xl border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Bike size={16} /> Rider Portal
+            </button>
+            <button 
+              onClick={() => router.push('/')}
+              className="bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-lg flex items-center gap-2 cursor-pointer"
+            >
+              <Plus size={16} /> Place New Order
+            </button>
+          </div>
         </div>
 
         {/* Tab Switcher */}
@@ -253,6 +311,9 @@ export default function DashboardPage() {
                         <div className="mt-2 p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-cyan-300 font-mono text-[11px] space-y-0.5">
                           <p className="flex items-center gap-1"><Truck size={12} /> Return AWB: {order.reverseTrackingId}</p>
                           <p className="text-slate-400 text-[10px]">Scheduled Pickup: {order.scheduledPickup}</p>
+                          {order.pickupOtp && (
+                            <p className="text-amber-300 font-bold">Pickup OTP: {order.pickupOtp}</p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -268,7 +329,6 @@ export default function DashboardPage() {
                     </button>
 
                     <div className="flex items-center gap-4">
-                      {/* Back to Store Link working seamlessly */}
                       <button 
                         onClick={() => router.push('/')}
                         className="text-xs text-blue-400 hover:underline font-semibold cursor-pointer"

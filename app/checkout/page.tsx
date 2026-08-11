@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
 import { MapPin, Plus, Check, ShieldCheck, CreditCard, LocateFixed, Wallet, Smartphone, Building2, Calendar, AlertCircle, Loader2, Star, MessageSquare } from 'lucide-react';
 
 interface Address {
@@ -141,7 +142,7 @@ export default function CheckoutPage() {
     setFullName(''); setPhone(''); setStreet(''); setCity(''); setState(''); setPincode('');
   };
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     setErrorMessage('');
 
     if (!selectedAddress) {
@@ -173,8 +174,14 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      // Fix: Read from 'electrohub_cart' instead of 'cart' to match CartContext storage key
+    try {
+      // Initialize Supabase client to fetch the active user ID securely
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      const { data: { user } } = await supabase.auth.getUser();
+
       const rawCart = JSON.parse(localStorage.getItem('electrohub_cart') || localStorage.getItem('cart') || '[]');
       
       let cartItems = [];
@@ -205,6 +212,7 @@ export default function CheckoutPage() {
 
       const newOrder = {
         orderId: generatedId,
+        userId: user?.id || null, // Tied securely to user ID
         items: cartItems,
         totalAmount,
         paymentMethod,
@@ -213,15 +221,34 @@ export default function CheckoutPage() {
         shippingAddress: selectedAddress
       };
 
-      const existingOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-      localStorage.setItem('orders', JSON.stringify([newOrder, ...existingOrders]));
+      // 1. Save into User-Specific LocalStorage key to prevent cross-user order leakage
+      const storageKey = user ? `orders_${user.id}` : 'orders_guest';
+      const existingOrders = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      localStorage.setItem(storageKey, JSON.stringify([newOrder, ...existingOrders]));
+
       localStorage.removeItem('electrohub_cart');
       localStorage.removeItem('cart');
+
+      // 2. Sync to Supabase Database Backend for Admin Panel visibility
+      const response = await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newOrder),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        console.warn('Database sync warning:', result.message);
+      }
 
       setIsSubmitting(false);
       setConfirmedOrderId(generatedId);
       setOrderConfirmed(true);
-    }, 1000);
+    } catch (err) {
+      console.error('Error processing order submission:', err);
+      setIsSubmitting(false);
+      triggerError('An error occurred while placing your order. Please try again.');
+    }
   };
 
   const handleFeedbackSubmit = (e: React.FormEvent) => {
@@ -539,7 +566,7 @@ export default function CheckoutPage() {
         >
           {isSubmitting ? (
             <>
-              <Loader2 size={16} className="animate-spin" /> Processing Order...
+              <Loader2 size={16} className="animate-spin" /> Processing & Syncing to Database...
             </>
           ) : (
             <>

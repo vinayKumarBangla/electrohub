@@ -1,87 +1,109 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js';
+import { Package, Truck, Clock } from 'lucide-react';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+);
 
 export default function TrackOrderPage() {
-  const [orderId, setOrderId] = useState('');
-  const [trackedOrder, setTrackedOrder] = useState<any | null>(null);
+  const [orderId, setOrderId] = useState<string>('');
+  const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleTrackOrder = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!orderId.trim()) return;
 
-    // Simulated tracking lookup
-    setTrackedOrder({
-      id: orderId.toUpperCase(),
-      status: 'Out for Delivery',
-      estimatedDelivery: 'Tomorrow, by 8:00 PM',
-      items: [{ name: 'Tech Hardware Product', qty: 1 }],
-      steps: [
-        { title: 'Order Placed', completed: true, date: 'Today, 10:30 AM' },
-        { title: 'Packed & Dispatched', completed: true, date: 'Today, 3:15 PM' },
-        { title: 'Out for Delivery', completed: true, date: 'Estimated Tomorrow' },
-        { title: 'Delivered', completed: false, date: 'Pending' },
-      ],
-    });
+    setLoading(true);
+    setError('');
+
+    try {
+      const searchTerm = orderId.trim().toLowerCase();
+      
+      // Fetch orders saved in browser local storage
+      const savedOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+      
+      // Find the matching order by ID
+      const foundOrder = savedOrders.find(
+        (o: any) => o.orderId?.toLowerCase() === searchTerm || o.id?.toLowerCase() === searchTerm
+      );
+
+      if (!foundOrder) {
+        setError('Order not found. Please check your Order ID.');
+        setOrder(null);
+      } else {
+        setOrder(foundOrder);
+      }
+    } catch (err) {
+      setError('An error occurred while fetching the order.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-slate-100 px-6 py-12">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-extrabold tracking-tight text-white mb-2">
-          Track Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">Order</span>
-        </h1>
-        <p className="text-slate-400 text-sm mb-8">Enter your Order ID to check live shipment status and delivery details.</p>
+    <div className="min-h-screen bg-[#0a0e17] text-slate-100 py-10 px-4">
+      <div className="max-w-md mx-auto bg-[#131822] border border-slate-800 rounded-3xl shadow-2xl p-6 space-y-6">
+        <div className="text-center space-y-1">
+          <h1 className="text-2xl font-black text-white">Track Your Order</h1>
+          <p className="text-xs text-slate-400">
+            Enter your order ID below to see live status updates.
+          </p>
+        </div>
 
-        <form onSubmit={handleSearch} className="flex gap-3 mb-10">
-          <input 
-            type="text" 
-            placeholder="Enter Order ID (e.g., #ORD-123456)" 
-            value={orderId}
-            onChange={(e) => setOrderId(e.target.value)}
-            required
-            className="flex-1 bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500"
-          />
-          <button 
+        <form onSubmit={handleTrackOrder} className="space-y-4">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+              Order ID
+            </label>
+            <input
+              type="text"
+              value={orderId}
+              onChange={(e) => setOrderId(e.target.value)}
+              placeholder="e.g. ORD-19367"
+              className="w-full bg-[#0a0e17] border border-slate-700 rounded-xl px-4 py-3 text-xs text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              required
+            />
+          </div>
+          <button
             type="submit"
-            className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold px-6 py-3 rounded-xl text-sm shadow-lg hover:from-blue-500 hover:to-cyan-400 transition-all cursor-pointer"
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs py-3 rounded-xl transition shadow-lg cursor-pointer"
           >
-            Track
+            {loading ? 'Searching...' : 'Track Live Status'}
           </button>
         </form>
 
-        {trackedOrder && (
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-6 backdrop-blur-md">
-            <div className="flex flex-col sm:flex-row justify-between pb-6 border-b border-slate-800 gap-2">
+        {error && (
+          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-xs rounded-xl text-center">
+            {error}
+          </div>
+        )}
+
+        {order && (
+          <div className="mt-6 border-t border-slate-800 pt-6 space-y-4">
+            <div className="flex justify-between items-center bg-blue-600/10 p-4 rounded-xl border border-blue-500/20">
               <div>
-                <span className="text-xs text-slate-400">Order ID:</span>
-                <h3 className="text-lg font-bold text-white font-mono">{trackedOrder.id}</h3>
+                <p className="text-[10px] text-blue-400 font-bold uppercase">Current Status</p>
+                <p className="text-base font-black text-white mt-0.5">{order.status || 'Processing'}</p>
               </div>
-              <div className="text-left sm:text-right">
-                <span className="text-xs text-slate-400">Status:</span>
-                <div className="text-cyan-400 font-semibold">{trackedOrder.status}</div>
-              </div>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">
+                Live Feed Active
+              </span>
             </div>
 
-            {/* Steps Timeline */}
-            <div className="space-y-6 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-slate-800">
-              {trackedOrder.steps.map((step: any, index: number) => (
-                <div key={index} className="flex items-start gap-4 relative">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold z-10 ${step.completed ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-500'}`}>
-                    {step.completed ? '✓' : index + 1}
-                  </div>
-                  <div>
-                    <h4 className={`text-sm font-semibold ${step.completed ? 'text-white' : 'text-slate-500'}`}>{step.title}</h4>
-                    <p className="text-xs text-slate-400 mt-0.5">{step.date}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="pt-4 border-t border-slate-800 flex justify-between items-center text-xs text-slate-400">
-              <span>Expected Delivery: <strong className="text-white">{trackedOrder.estimatedDelivery}</strong></span>
-              <Link href="/products" className="text-blue-400 hover:underline">Back to Store</Link>
+            <div className="text-xs space-y-2 text-slate-300 bg-[#0a0e17] p-4 rounded-xl border border-slate-800">
+              <p><span className="font-bold text-slate-400">Order ID:</span> <span className="font-mono text-blue-400">{order.orderId}</span></p>
+              <p><span className="font-bold text-slate-400">Total Amount:</span> ₹ {order.totalAmount?.toLocaleString('en-IN')}</p>
+              {order.scheduledPickup && (
+                <p className="text-cyan-300"><span className="font-bold text-slate-400">Scheduled Pickup:</span> {order.scheduledPickup}</p>
+              )}
+              <p><span className="font-bold text-slate-400">Created At:</span> {order.date || 'N/A'}</p>
             </div>
           </div>
         )}

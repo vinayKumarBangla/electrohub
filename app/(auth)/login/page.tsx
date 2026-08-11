@@ -38,11 +38,14 @@ export default function LoginPage() {
         );
       }
 
-      router.push('/');
-      router.refresh();
+      // Allow a brief moment for Supabase auth cookies to persist before navigating and refreshing
+      setTimeout(() => {
+        router.push('/');
+        router.refresh();
+      }, 300);
+
     } catch (err: any) {
       setErrorMessage(err.message || 'Login failed. Please check your credentials.');
-    } finally {
       setLoading(false);
     }
   };
