@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
-import { ShoppingCart, User, LogIn, Package, LogOut, ChevronDown } from 'lucide-react';
+import { ShoppingCart, User, LogIn, Package, LogOut, ChevronDown, Search } from 'lucide-react';
 
 export default function Navbar() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [userName, setUserName] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -82,20 +83,39 @@ export default function Navbar() {
     router.refresh();
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
   return (
-    <header className="bg-[#131822] border-b border-slate-800 sticky top-0 z-[100] px-3 sm:px-6 py-3.5 flex items-center justify-between shadow-md">
+    <header className="bg-[#131822] border-b border-slate-800 sticky top-0 z-[100] px-2.5 sm:px-6 py-3 flex items-center justify-between gap-2 shadow-md">
       {/* Brand Logo */}
       <div 
-        className="flex items-center gap-2 cursor-pointer" 
+        className="flex items-center gap-1.5 cursor-pointer shrink-0" 
         onClick={() => router.push('/')}
       >
-        <span className="text-lg sm:text-xl font-black text-white">
+        <span className="text-base sm:text-xl font-black text-white tracking-tight">
           TechCart <span className="text-blue-500">OS</span>
         </span>
       </div>
 
+      {/* Responsive Search Bar */}
+      <form onSubmit={handleSearch} className="flex-1 max-w-xs sm:max-w-md mx-1 sm:mx-4 flex items-center relative">
+        <input
+          type="text"
+          placeholder="Search products..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-slate-900 border border-slate-700 text-slate-100 px-3 py-1.5 pl-8 rounded-xl text-xs focus:outline-none focus:border-blue-500 transition"
+        />
+        <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" />
+      </form>
+
       {/* Navigation Actions */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         <button
           onClick={() => router.push('/dashboard')}
           className="bg-slate-800/80 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs font-bold transition items-center gap-1.5 cursor-pointer border border-slate-700 hidden sm:flex"
@@ -120,14 +140,14 @@ export default function Navbar() {
                   e.stopPropagation();
                   setDropdownOpen((prev) => !prev);
                 }}
-                className="bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600/30 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer select-none"
+                className="bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600/30 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer select-none"
               >
                 <User size={15} className="shrink-0" /> 
-                <span className="truncate max-w-[70px] sm:max-w-none">{userName}</span>
+                <span className="truncate max-w-[55px] sm:max-w-none">{userName}</span>
                 <ChevronDown size={14} className="shrink-0" />
               </button>
 
-              {/* Mobile-Friendly Dropdown Box */}
+              {/* Mobile Dropdown Box */}
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-[#1b2230] text-slate-100 border border-slate-700 rounded-2xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.9)] py-2 z-[99999] text-xs space-y-1">
                   <button
